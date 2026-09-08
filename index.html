@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>人生模拟器 · 文字版</title>
+<style>
+  :root{--bg:#0f1419;--panel:#1a212b;--card:#202a37;--line:#2c3a4a;
+    --txt:#e6edf3;--muted:#8b98a5;--accent:#4da3ff;--good:#3ddc84;--bad:#ff6b6b;--gold:#ffd166;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--txt);font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+    min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px 12px;}
+  .wrap{width:100%;max-width:720px;}
+  header{text-align:center;padding:14px 0 4px;}
+  header h1{font-size:26px;letter-spacing:2px;color:var(--gold);}
+  header .sub{color:var(--muted);font-size:13px;margin-top:6px;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;
+    box-shadow:0 10px 30px rgba(0,0,0,.35);margin-top:14px;}
+  .panel h2{font-size:16px;margin-bottom:10px;color:var(--accent);}
+  .statgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;}
+  .stat{display:flex;align-items:center;gap:6px;font-size:13px;}
+  .stat .label{width:34px;color:var(--muted);flex-shrink:0;}
+  .stat .bar{flex:1;height:10px;background:#0d1117;border-radius:6px;overflow:hidden;}
+  .stat .bar i{display:block;height:100%;background:var(--accent);transition:width .5s;}
+  .stat .val{width:70px;text-align:right;font-variant-numeric:tabular-nums;}
+  .meta{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--muted);margin-top:9px;padding-top:9px;border-top:1px dashed var(--line);}
+  .meta b{color:var(--txt);font-weight:600;}
+  .wth{color:var(--gold);}
+  .achrow{display:flex;flex-wrap:wrap;gap:4px;margin-top:9px;}
+  .ach{background:rgba(255,209,102,.12);color:var(--gold);border:1px solid rgba(255,209,102,.3);
+    padding:1px 8px;border-radius:20px;font-size:11.5px;}
+  .stage{min-height:80px;white-space:pre-line;line-height:1.75;font-size:14.5px;padding:4px 0;}
+  .e{color:var(--good);font-weight:600;} .b{color:var(--bad);font-weight:600;}
+  .g{color:var(--gold);font-weight:600;} .f{color:var(--accent);} .dim{color:var(--muted);}
+  .opts{display:flex;flex-direction:column;gap:8px;margin-top:14px;}
+  .opt{background:var(--card);border:1px solid var(--line);color:var(--txt);padding:11px 13px;border-radius:9px;
+    text-align:left;font-size:14px;cursor:pointer;transition:.15s;line-height:1.5;}
+  .opt:hover:not(:disabled){border-color:var(--accent);background:#26334a;transform:translateX(3px);}
+  .opt:disabled{opacity:.4;cursor:not-allowed;}
+  .opt .lock{color:var(--muted);font-size:12px;margin-left:4px;}
+  .btnsub{margin-top:12px;}
+  .btn{width:100%;background:linear-gradient(135deg,#3a8dff,#4da3ff);color:#fff;border:none;padding:13px;border-radius:10px;
+    font-size:15px;font-weight:600;cursor:pointer;letter-spacing:2px;transition:.15s;}
+  .btn:hover{filter:brightness(1.1);} .btn.ghost{background:var(--card);color:var(--txt);border:1px solid var(--line);}
+  .alloc{display:flex;flex-direction:column;gap:9px;margin-bottom:6px;}
+  .allocrow{display:flex;align-items:center;gap:8px;}
+  .allocrow .label{width:76px;font-size:14px;}
+  .allocrow .ac{width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:#0d1117;
+    color:var(--accent);font-size:18px;cursor:pointer;}
+  .allocrow .val{width:40px;text-align:center;font-size:16px;font-variant-numeric:tabular-nums;}
+  .allocrow .des{color:var(--muted);font-size:11px;}
+  .total{color:var(--gold);font-weight:600;font-size:15px;text-align:center;padding:8px;}
+  .history{background:#0d1117;border:1px solid var(--line);border-radius:10px;padding:10px 14px;max-height:140px;
+    overflow-y:auto;margin-top:12px;font-size:12.5px;color:var(--muted);}
+  .history div::before{content:"· ";color:var(--accent);}
+  .banner{background:linear-gradient(135deg,#2b1e4a,#4a2e8a);border:1px solid #6a4dc9;padding:16px;border-radius:14px;margin-top:14px;}
+  .banner h2{color:var(--gold);}
+  .numhelp{color:var(--muted);font-size:11px;text-align:center;margin-top:4px;}
+  @media(max-width:520px){.statgrid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><h1>人生模拟器</h1><div class="sub">从高考后的某一天开始，书写属于你的一生。</div></header>
+  <div id="view"></div>
+  <div class="history" id="history" style="display:none"></div>
+  <div class="footer" style="text-align:center;color:var(--muted);font-size:12px;margin:18px 0 30px;">纯文字人生模拟 · 每个选择都算数</div>
+</div>
+<script>
+"use strict";
+/* ---------- 工具 ---------- */
+const $=id=>document.getElementById(id);
+const ri=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+function roll(p){return Math.random()*100<p;}
+function clamp(v,l,h){return Math.max(l,Math.min(h,v));}
+function pick(a){return a[Math.floor(Math.random()*a.length)];}
+function check(stat,dc){return (P.stats[stat]+ri(0,25))>=dc;}
+
+/* ---------- 数据库 ---------- */
+const MAJORS=[
+ {id:"cs",name:"计算机科学",base:9000,tags:["tech"],desc:"高薪、加班多、技术迭代快，互联网大厂敲门砖。"},
+ {id:"med",name:"临床医学",base:7000,tags:["med"],desc:"前期苦读规培，越老越吃香，也有医闹风险。"},
+ {id:"fin",name:"金融经济",base:11000,tags:["fin"],desc:"起薪高、压力大、行情波动大。"},
+ {id:"law",name:"法学",base:6500,tags:["law"],desc:"考证内卷，但考出之后越老越吃香。"},
+ {id:"lit",name:"文学新闻",base:5500,tags:["lit"],desc:"情怀和理想，收入一般，文笔到处吃香。"},
+ {id:"pe",name:"体育教育",base:5000,tags:["pe"],desc:"身体是本钱，职业寿命短但体质好。"},
+ {id:"art",name:"艺术设计",base:4500,tags:["art"],desc:"自由职业、收入波动大，才华即身家。"},
+ {id:"civil",name:"土木建筑",base:6000,tags:["civil"],desc:"工地辛苦、行业有周期，但历练人。"}];
+const UNIVERSITIES=[{name:"专科院校",mult:.85,need:0},{name:"普通本科",mult:1,need:16},{name:"重点大学(211)",mult:1.15,need:24},{name:"顶尖名校(985)",mult:1.3,need:32}];
+const COMPANIES=[
+ {name:"互联网大厂",desc:"高薪福利好，但996是常态。",salary:1.25,stress:25},
+ {name:"稳定国企",desc:"旱涝保收，节奏慢。",salary:.85,stress:5},
+ {name:"创业公司",desc:"薪资加期权，赌一个未来。",salary:1,stress:20},
+ {name:"事业单位",desc:"稳定铁饭碗，收入中等。",salary:.8,stress:3},
+ {name:"外企",desc:"WLB好，中年危机小。",salary:1.15,stress:12}];
+const SPOUSES=[
+ {id:"doctor",name:"医生",salary:15000,desc:"收入高工作稳，但值班多、陪伴少，有医闹风险。"},
+ {id:"programmer",name:"程序员",salary:18000,desc:"年薪几十万，但加班多、有点直男。"},
+ {id:"teacher",name:"教师",salary:7500,desc:"稳定顾家有寒暑假，收入一般。"},
+ {id:"civil_srv",name:"公务员",salary:8500,net:true,desc:"铁饭碗人脉广，收入中等。"},
+ {id:"nurse",name:"护士",salary:8000,desc:"辛苦但温柔，收入尚可。"},
+ {id:"entrep",name:"创业者",salary:12000,volatile:true,desc:"收入大起大落，可能暴富也可能负债。"},
+ {id:"artist",name:"文艺青年",salary:4500,desc:"浪漫体贴，但穷。"}];
+const CARS=[{name:"二手代步车",price:40000,desc:"能开就行，遮风挡雨。"},{name:"普通家用车",price:150000,desc:"主流选择，面子实用兼顾。"},{name:"豪华品牌车",price:500000,desc:"开出去有面子，养起来肉疼。"},{name:"进口跑车",price:1200000,desc:"人生赢家的玩具。"}];
+const HOUSES=[{name:"老破小一居",price:800000,month:3200,quality:1,desc:"地段尚可，就是旧了点。"},{name:"市区普通两居",price:1800000,month:6800,quality:2,desc:"主流刚需房，学区一般。"},{name:"学区房三居",price:3800000,month:13500,quality:3,desc:"为了孩子赢在起跑线。"},{name:"市中心大平层",price:8000000,month:28000,quality:4,desc:"塔尖生活的象征。"}];
+const LIGHT=[{name:"重感冒",cost:1500,hp:5},{name:"急性肠胃炎",cost:2500,hp:8},{name:"意外骨折",cost:12000,hp:12},{name:"过劳晕倒",cost:3000,hp:8}];
+const CHRONIC=[{name:"高血压",cost:1500,hp:3},{name:"糖尿病",cost:2000,hp:3},{name:"脂肪肝",cost:1200,hp:3},{name:"腰椎间盘突出",cost:3000,hp:4}];
+const SERIOUS=[{name:"恶性肿瘤",cost:400000,hp:45,kill:.55},{name:"心肌梗死",cost:250000,hp:40,kill:.45},{name:"重度脑卒中",cost:200000,hp:35,kill:.35}];
+
+/* ---------- 状态 ---------- */
+let P=null, logq=[], modalOpen=false;
+function newPerson(){return{name:"",age:18,stats:{iq:10,eq:10,sta:10,wth:10,net:10},health:100,stress:0,alive:true,
+  university:null,major:null,degree:"本科",company:null,job:null,salary:0,spouse:null,married:false,children:[],
+  house:null,mortgage:0,car:null,retired:false,promoted:0,love:null,achievements:[],history:[],
+  lastCar:0,lastHouse:0,deathReason:null};}
+const fxob=(p,k,v)=>{if(["iq","eq","sta","net"].includes(k))p.stats[k]=clamp(p.stats[k]+v,0,100);
+  else if(k==="wth")p.stats.wth=Math.max(0,p.stats.wth+v);else if(k==="health")p.health=clamp(p.health+v,0,100);
+  else if(k==="stress")p.stress=clamp(p.stress+v,0,100);else if(k==="salary")p.salary=Math.max(0,p.salary+v);};
+const setFx=o=>{for(const k in o)fxob(P,k,o[k]);};
+const rec=t=>P.history.push(P.age+"岁："+t);
+const ach=n=>{if(!P.achievements.includes(n)){P.achievements.push(n);L("@达成成就："+n,"g");}};
+const N=()=>"\n"; const L=(t,c)=>{logq.push(c?{t,c}:"\n"+t);};
+
+/* ---------- 渲染 ---------- */
+function fmtText(){return logq.map(x=>{if(typeof x==="string")return x;const cls=x.c;
+  return cls==="e"?`<span class="e">${x.t}</span>`:cls==="b"?`<span class="b">${x.t}</span>`:cls==="g"?`<span class="g">${x.t}</span>`:cls==="f"?`<span class="f">${x.t}</span>`:cls==="dim"?`<span class="dim">${x.t}</span>`:x.t;}).join("");}
+function statBar(label,vv,col,extra){return `<div class="stat"><span class="label">${label}</span><span class="bar"><i style="width:${clamp(vv,0,100)}%;background:${col}"></i></span><span class="val">${vv}</span></div>`;}
+function renderStatusInto(panel){
+  const s=P.stats;
+  const gc=P.health>50?"var(--good)":P.health>25?"var(--gold)":"var(--bad)";
+  const sc=P.stress>60?"var(--bad)":"var(--gold)";
+  let cards=`<div class="statgrid">`+
+   statBar("IQ",s.iq,"var(--accent)")+statBar("EQ",s.eq,"var(--accent)")+
+   statBar("STA",s.sta,"var(--accent)")+statBar("HP",P.health,gc)+
+   `<div class="stat"><span class="label">压力</span><span class="bar"><i style="width:${P.stress}%;background:${sc}"></i></span><span class="val">${P.stress}</span></div>`+
+   `<div class="stat"><span class="label">财富</span><span class="bar"><i style="width:${clamp(s.wth/12000000*100,0,100)}%;background:var(--gold)"></i></span><span class="val"><b class="wth">${s.wth.toLocaleString()}元</b></span></div>`+
+   `</div>`;
+  let meta=`<div class="meta"><span>🗓 ${P.age}岁</span><span>🎓 ${P.university||"—"}  ${P.major?P.major.name:""}</span><span>💼 ${P.retired?"退休":P.job||"无业"}</span><span>月薪 <b>${P.salary.toLocaleString()}</b></span>`;
+  if(P.married&&P.spouse)meta+=`<span>💞${P.spouse.name}</span>`;
+  if(P.children.length)meta+=`<span>👶${P.children.length}</span>`;
+  if(P.house)meta+=`<span>🏠${P.house.name}</span>`;
+  if(P.car)meta+=`<span>🚗${P.car.name}</span>`;
+  if(P.mortgage)meta+=`<span class="b">房贷${P.mortgage}/月</span>`;
+  meta+=`</div>`;
+  let achrow=P.achievements.length?`<div class="achrow">${P.achievements.map(a=>`<span class="ach">${a}</span>`).join("")}</div>`:"";
+  panel.insertAdjacentHTML("afterbegin",cards+meta+achrow);
+}
+function show(cfg){ // {title, opts?, next?{label,fn}}
+  const v=$("view");
+  let body=cfg.menuHtml||"";
+  if(!cfg.menuHtml){
+    body=`<div class="stage">${fmtText()}</div>`;
+    if(cfg.opts&&cfg.opts.length){
+      body+=`<div class="opts">`+cfg.opts.map((o,i)=>{
+        const avail=o.avail===false?false:true;
+        return `<button class="opt" data-i="${i}" ${avail?"":"disabled"}>${o.label}${avail?"":`<span class="lock">（无法选择）</span>`}</button>`;
+      }).join("")+`</div>`;
+    } else if(cfg.next){
+      body+=`<div class="btnsub"><button class="btn" id="nxt">${cfg.next.label||"继续"}</button></div>`;
+    }
+  }
+  v.innerHTML=`<div class="panel"><h2>${cfg.title||""}</h2>${body}</div>`;
+  renderStatusInto(v.querySelector(".panel"));
+  if(cfg.opts){
+    v.querySelectorAll(".opt").forEach(b=>{const i=+b.dataset.i;if(b.disabled)return;b.onclick=()=>{modalOpen=false;cfg.opts[i].fn();};});
+  }
+  if(cfg.next){$("nxt").onclick=()=>{modalOpen=false;cfg.next.fn();};}
+  const h=$("history");h.style.display=P&&P.history.length?"block":"none";
+  h.innerHTML=P?P.history.map(x=>`<div>${x}</div>`).join(""):"";
+  h.scrollTop=h.scrollHeight;
+}
+const showTitle=t=>{logq=[];show({title:t});};
+const blue=n=>{L("\n"+(n||"继续…"),"f");};
+
+/* ---------- 分配属性 ---------- */
+let pts={iq:30,eq:20,sta:20,wth:15,net:15};
+function showAlloc(){
+  const lab={iq:"智商",eq:"情商",sta:"体力",wth:"财富",net:"人脉"};
+  const des={iq:"学习/工作能力",eq:"人际/恋爱/家庭",sta:"健康/抗压/寿命",wth:"存款(1点≈5千)",net:"关系/关键贵人"};
+  function total(){return pts.iq+pts.eq+pts.sta+pts.wth+pts.net;}
+  function draw(){
+    let rows=Object.keys(pts).map(k=>`<div class="allocrow"><span class="label">${lab[k]}</span>
+      <button class="ac" data-k="${k}" data-d="-1">−</button><span class="val" id="av_${k}">${pts[k]}</span>
+      <button class="ac" data-k="${k}" data-d="1">＋</button><span class="des">${des[k]}</span></div>`).join("");
+    const t=total();
+    const v=$("view");
+    v.innerHTML=`<div class="panel"><h2>分配你的初始属性</h2>
+      <div class="stage">高考结束了。五大属性初始共 100 点，自由分配。<br><span class="dim">1 点财富 ≈ 5000 元初始存款。<br>2. 智商决定大学档次与专业技能</span></div>
+      <div class="alloc">${rows}<div class="total">点数：${t} / 100</div></div>
+      <button class="btn" id="allocok">${t===100?"确认并开启新的人生":`还差 ${100-t} 点才能开始`}</button>
+      <div class="numhelp">提示：智商配专业上限，情商管婚姻家庭，体力保命，人脉关键时刻救命。</div></div>`;
+    v.querySelectorAll(".ac").forEach(b=>{b.onclick=()=>{const k=b.dataset.k,d=+b.dataset.d;
+      const nv=pts[k]+d;if(nv<5||nv>40||t+d>100)return;pts[k]=nv;draw();};});
+    const ok=$("allocok");ok.disabled=t!==100;if(t===100)ok.onclick=startLife;
+  }
+  draw();
+}
+
+/* ---------- 开始：高考 → 专业 ---------- */
+function startLife(){P=newPerson();P.stats.iq=pts.iq;P.stats.eq=pts.eq;P.stats.sta=pts.sta;P.stats.wth=pts.wth*5000;P.stats.net=pts.net;graduation();}
+function uniMult(){let m=.85;for(const u of UNIVERSITIES)if(P.stats.iq>=u.need)m=u.mult;return m;}
+function graduation(){
+  let u=UNIVERSITIES[0];for(const x of UNIVERSITIES)if(P.stats.iq>=x.need)u=x;
+  P.university=u.name;rec("高考考入"+u.name);
+  logq=[`%高考出分！你考入了【${u.name}】。\n现在，填报志愿——专业将决定你一生的大方向：`];
+  show({title:P.age+"岁 · 高考出分",opts:MAJORS.map(m=>({label:m.name+" — "+m.desc,fn:()=>{P.major=m;rec("选择专业："+m.name);uniLoop();}}))});
+}
+
+/* ---------- 大学（18-21岁，每年一个事件） ---------- */
+const uniAges=[18,19,20,21];let ui=0;
+function uniLoop(){ if(ui>=uniAges.length){P.age=22;graduationPath();return;} P.age=uniAges[ui]; logq=[`—— ${P.age}岁 · 大学生活 ——`]; runOneUni(); }
+function runOneUni(){
+  const ev=pick(UNIEV);ev(P);
+  setFx({wth:12000}); // 年度生活费
+  show({title:P.age+"岁 · 大学生活",opts:[{label:"继续学业",fn:()=>{ui++;uniLoop();}}]});
+}
+const UNIEV=[p=>{if(check("iq",22)){const a=ri(2000,8000);setFx({wth:a,iq:1});L("%期末大考发挥出色，拿下"+a+"元一等奖学金；","e");rec("获得一等奖学金");ach("学霸初体验");}else{setFx({stress:10,iq:-1});L("期末考砸了，排名滑到年级后30%，奖学金无缘。","b");}},
+ p=>{setFx({eq:2,net:3});L("你加入辩论社/学生会，学会和人打交道，结识一帮朋友。","f");if(roll(15)){setFx({net:2});L("\n还认识了校外行业前辈，拿到内推机会。","e");}rec("参加社团积累人脉");},
+ p=>{const a=ri(3000,9000);setFx({wth:a,sta:-2,eq:1});L(`你兼职/当家教/去公司打杂，赚了 ${a} 元零花钱，也提前感受了社会。`,"f");rec("兼职赚钱");},
+ p=>{if(check("eq",22)){setFx({eq:2,net:1});L("你在校园里谈起了恋爱，青春正好。","e");rec("大学恋爱");ach("校园恋爱");}else{setFx({eq:1,stress:8});L("你鼓起勇气表白，被发了好人卡，郁闷地吃了顿烧烤。","b");}},
+ p=>{setFx({sta:-4,stress:-6,iq:-1});L("宿舍楼下网吧通宵开黑，快乐是真的，身体也是真的垮了。","dim");},
+ p=>{if(check("iq",26)){setFx({iq:2,net:2});L("沉心备赛三个月，拿下国家级竞赛奖项！简历金光闪闪。","e");ach("竞赛获奖");rec("竞赛获奖");}else{setFx({iq:1,net:1});L("虽没拿奖，但历练了项目经验，认识了靠谱队友。","f");}},
+ p=>{const d=pick(LIGHT);setFx({wth:-d.cost,sta:-2,health:-d.hp,stress:5});L(`学业压力大，你病倒了：${d.name}。看病花了 ${d.cost} 元。`,"b");},
+ p=>{if(check("eq",20)){setFx({eq:2,net:1});L("和室友因作息闹矛盾，你主动请客化解，关系反而更铁。","e");}else{setFx({eq:-1,stress:8});L("和室友冷战抗议，最后换宿舍收场。","b");}}];
+
+/* ---------- 毕业路径 ---------- */
+function graduationPath(){
+  const opts=[{label:"直接就业，投简历找工作",fn:jobFair}];
+  if(P.stats.iq>=26)opts.push({label:"保研深造（读研2年，起薪更高）",fn:()=>{rec("保研");P.degree="硕士";P.age+=2;setFx({iq:4,net:2});logq=["%你选择保研，又多读了2年书，毕业时起薪更高。" ];jobFair();}});
+  if(P.stats.wth>=150000)opts.push({label:"出国留学（金钱镀金，视野开阔）",fn:()=>{setFx({wth:-Math.min(200000,P.stats.wth)});P.degree="海归硕士";P.age+=2;setFx({iq:5,eq:2,net:3});rec("海外留学");ach("海归学历");logq=["%你出国留学2年，"+P.degree+"归来，眼界大开，也结识了全球朋友。"];jobFair();}});
+  if(P.stats.iq+P.stats.net>=40||P.stats.wth>=300000)opts.push({label:"毕业即创业（高风险高回报）",fn:()=>{P.job="创业公司创始人";P.company="自创公司";P.salary=Math.floor(P.major.base*0.6);rec("毕业即创业");ach("勇敢创业");logq=["%你怀揣梦想注册了公司，成为一名创业者。前路未卜。"];venture();}});
+  logq=[`—— ${P.age}岁 · 大学毕业 ——\n%人生第一个重大分岔路口，何去何从？`];
+  show({title:"毕业季",opts:opts});
+}
+function jobFair(){
+  const lst=COMPANIES.map(c=>{let s=Math.floor(P.major.base*c.salary*uniMult());if(P.degree==="硕士")s=Math.floor(s*1.35);if(P.degree==="海归硕士")s=Math.floor(s*1.5);return{c,s};});
+  logq=[`你海投几十份简历，最终筛出三份不错的 offer：\n${lst.map((o,i)=>`${i+1}. ${o.c.name}（${o.c.desc}）月薪 ${o.s.toLocaleString()}元`).join("\n")}`];
+  show({title:P.age+"岁 · 求职季",opts:lst.map(o=>({label:`入职 ${o.c.name}（月薪 ${o.s.toLocaleString()}）`,fn:()=>{P.company=o.c.name;P.job="初级员工";P.salary=o.s;setFx({stress:o.c.stress});rec("入职"+o.c.name);ach("第一份工作");logq=[`%你入职了【${o.c.name}】，月薪 ${o.s.toLocaleString()}元。职场生涯开始。`];continueTo(lifeLoop);}}))});
+}
+
+/* ---------- 主人生循环 ---------- */
+let loveDone=false;
+function continueTo(fn){show({title:P.age+"岁 · 继续人生",next:{label:"继续",fn:fn}});}
+function lifeLoop(){
+  if(!P.alive)return endGame();
+  modalOpen=false;
+  // 进入新年先结算上一年：收支 + 衰老 + 死亡检查（确保每年必结算，绝不卡死）
+  if(P.job||P.retired){ finances(); aging(); if(checkDeath())return; }
+  P.age++;logq=[];
+  if(P.age===30&&isWorker()&&!P.retired)return milestonePromotion();
+  if(P.age===40&&P.promoted>=1&&P.job&&P.job.includes("主管")&&!P.retired)return milestonePromotion();
+  if(P.age===55&&P.promoted>=2&&P.job&&P.job.includes("总监")&&!P.retired)return milestonePromotion();
+  if(P.age===60&&!P.retired)return retireLife();
+  if(!P.married&&!P.love&&P.age>=24&&P.age<=32&&!loveDone){loveDone=true;return meet();}
+  if(!P.car&&P.age>=24&&P.age<=50&&P.age-P.lastCar>=3&&P.stats.wth>=40000){P.lastCar=P.age;return buyCar();}
+  if(!P.house&&P.age>=26&&P.age<=45&&P.age-P.lastHouse>=3&&(P.stats.wth>=150000||P.married)){P.lastHouse=P.age;return buyHouse();}
+  runPools(); if(modalOpen)return;
+  showYear();
+}
+function aging(){
+  const age=P.age;
+  if(age>=45&&age%2===0)fxob(P,"sta",-1);
+  if(age>=55){fxob(P,"sta",-1);fxob(P,"health",-1);}
+  if(age>=65){fxob(P,"sta",-2);fxob(P,"health",-2);}
+  if(age>=75){fxob(P,"sta",-3);fxob(P,"health",-3);}
+  if(P.stress>=70)fxob(P,"health",-2);
+  if(P.stress>=60&&P.stats.sta<15)fxob(P,"health",-1);
+  // 压力自然缓解 + 体力自然恢复
+  fxob(P,"stress",-(3+Math.floor(P.stats.eq/10)));
+  if(P.health>=60)fxob(P,"sta",2); else if(P.health>=30)fxob(P,"sta",1);
+  P.children.forEach(c=>c.age++);
+}
+function isWorker(){return P.job&&P.job!=="创业公司创始人"&&P.job!=="创业合伙人";}
+function runPools(){
+  const go=(pool)=>{for(const ev of pool){if(ev.c(P)){ev.f(P);if(modalOpen)return;break;}}};
+  if(P.job&&!P.retired)go(WORK);
+  if(!modalOpen)go(LIFE);
+  if(!modalOpen)go(HEALTH);
+  if(!modalOpen&&(P.married||P.love))go(LOVE);
+}
+function showYear(){
+  if(logq.length===0)L(`${P.age}岁，生活继续……`,"dim");
+  show({title:(P.retired?"退休生活":P.job||"待业")+" · "+P.age+"岁",next:{label:"进入下一年",fn:lifeLoop}});
+}
+function finances(){
+  let inc=P.salary;if(P.married&&P.spouse){let si=P.spouse.salary;if(P.spouse.volatile)si=Math.floor(si*pick([0,1,1,2]));inc+=Math.floor(si/2);}
+  let exp=3000+(P.mortgage||0)+(P.car?1200:0)+(P.house?P.house.quality*400:0)+1500*P.children.length;
+  const net=(inc-exp)*12;
+  setFx({wth:net});
+  if(net>=0)L(`*（本年家庭净结余 ${net.toLocaleString()} 元）`,"dim");
+  else{L(`*（本年入不敷出，净亏 ${(-net).toLocaleString()} 元，日子紧巴巴）`,"b");setFx({stress:10});}
+}
+function checkDeath(){
+  const die=r=>{P.alive=false;P.deathReason=r;endGame();return true;};
+  if(P.stats.sta<=0)return die("身体彻底垮掉，油尽灯枯");
+  if(P.health<=0)return die("疾病与衰竭带走了你");
+  if(P.stress>=100)return die("长期高压导致的过劳猝死");
+  if(P.age>=80&&roll((P.age-80)*6))return die("寿终正寝，安详离世");
+  if(roll(0.3)&&P.age<90){if(roll(50)){setFx({health:-15,sta:-5,wth:-8000});rec("经历车祸幸存");L("!一场车祸，万幸只受了轻伤。","f");return false;}return die("意外事故");}
+  return false;
+}
+function endGame(){
+  const s=P.stats;
+  let sc=Math.floor(s.iq/2+s.eq/2+s.sta/2+s.net*2+s.wth/200000+(P.house?50:0)+(P.car?30:0)+(P.married?60:0)+P.children.length*30+P.achievements.length*15+(P.age>60?P.age-60:0));
+  sc=clamp(sc,0,999);
+  const rank=sc<150?"D 平庸":sc<250?"C 凡人":sc<350?"B 出色":sc<450?"A 优秀":"S 传奇";
+  logq=[`%${P.name}，享年 ${P.age} 岁。\n死因：${P.deathReason||"一生平静结束"}。`,`\n*最终财富：${s.wth.toLocaleString()} 元`,
+    `*IQ ${s.iq} / EQ ${s.eq} / STA ${s.sta} / NET ${s.net}`,
+    P.house?`*房产：${P.house.name}`:null,P.car?`*座驾：${P.car.name}`:null,
+    P.spouse?`*伴侣：${P.spouse.name}`:null,P.children.length?`*子女：${P.children.length} 个`:null,
+    `*成就(${P.achievements.length})：`+P.achievements.join(" "),"──────────","*一生年表：",...P.history.map(x=>"· "+x)].filter(Boolean);
+  show({title:`人生谢幕 ★ ${rank}（${sc} 分）★`,next:{label:"重新开始",fn:()=>location.reload()}});
+}
+
+/* ---------- 事件池 ---------- */
+const WORK=[],LIFE=[],HEALTH=[],LOVE=[];
+const W=(c,f)=>WORK.push({c,f});
+const Lf=(c,f)=>LIFE.push({c,f});
+const H=(c,f)=>HEALTH.push({c,f});
+const Lv=(c,f)=>LOVE.push({c,f});
+
+/* 工作事件 */
+W(()=>true,p=>{if(check("sta",18)){setFx({wth:ri(5000,20000),stress:15,sta:-3,net:1});L("项目上线冲刺，你扛住了，领导刮目相看发了奖金。","e");ach("拼命三郎");}else{setFx({stress:25,sta:-6,health:-6});L("连续熬夜让你差点倒下，项目也出了岔子。","b");}});
+W(()=>true,p=>{if(check("eq",20)){setFx({stress:10,eq:1});L("领导画饼PUA你，你表面附和，背地里盘算下一步棋。","f");}else{setFx({stress:20,sta:-4,health:-5});L("越想越气的PUA，你回家失眠，身体开始报警。","b");}});
+W(()=>true,p=>{if(check("eq",22)){setFx({eq:2,net:2,wth:8000});L("和竞聘对手化敌为友，合作做出亮眼成绩。","e");}else{setFx({stress:15,iq:-1});L("和对手互相使绊子，项目一塌糊涂，被各打五十大板。","b");}});
+W(()=>true,p=>{if(check("iq",25)){setFx({iq:2,net:2,salary:2000,stress:15,sta:-3});L("你主动牵头拿下大项目，晋升之门为你打开。","e");rec("主导重大项目成功");}else{setFx({stress:10});L("你没敢接大项目，机会落到别人头上。","dim");}});
+W(()=>true,p=>{if(check("iq",22)&&P.stats.wth>=5000){setFx({salary:Math.floor(P.salary*0.3),net:1,stress:-5});L("猎头打来电话，你凭本事谈了个好价码，跳槽加薪。","e");rec("跳槽加薪");}else{setFx({net:1});L("猎头挖你，你评估后觉得原平台前景更好，婉拒了。","f");}});
+W(()=>true,p=>{if(check("iq",20)){const a=ri(5000,30000);setFx({wth:a,sta:-3,stress:10});L(`同事拉你搞副业，居然做起来了，赚了 ${a} 元！`,"e");ach("副业达人");}else{setFx({wth:-ri(3000,15000),stress:10});L("副业投入不少钱，最后打了水漂。","b");}});
+W(()=>true,p=>{if(check("iq",24)){const a=ri(-5000,60000);setFx({wth:a});L(a>=0?`你眼光独到，投资赚了 ${a} 元！`:`行情不好，投资亏了 ${-a} 元。`,a>=0?"e":"b");if(a>=8000)ach("投资小能手");}else{const a=ri(-30000,8000);setFx({wth:a});L(`你跟风操作，亏了 ${-a} 元。`,"b");}});
+W(()=>true,p=>{if(check("eq",20)){setFx({net:3,iq:2,salary:1500});L("一位资深前辈提携你，带你进了核心圈子。","e");ach("贵人相助");rec("获贵人提携");}else{setFx({net:-1,stress:5});L("恃才傲物的你，把前辈的好意当耳旁风，机会溜走。","b");}});
+W(()=>!P.married,p=>{if(check("eq",22)){P.love=pick(SPOUSES);setFx({eq:2,net:1,stress:5});L("朝夕相处，你和同事擦出火花，谈起了办公室恋情。","e");ach("办公室恋情");}else{setFx({stress:10});L("你暗恋同事却不敢开口，只能默默工作。","dim");}});
+W(()=>P.company!=="创业公司"&&P.company!=="自创公司",p=>{modalOpen=true;logq.push(N()+ "有朋友邀请你辞职一起创业，给你原始股份：");
+  show({title:"创业邀请",opts:[
+    {label:"加入创业（高风险，可能暴富或血本无归）",fn:()=>{P.job="创业合伙人";P.salary=Math.floor(P.salary*0.6);rec("辞职加入创业");blue("你押上职业生涯，成为创业合伙人。");venture();}},
+    {label:"婉拒，留在原公司",fn:()=>{setFx({stress:-5});L("你选择了稳定，婉拒了邀请。","f");continueTo(lifeLoop);}}]});});
+W(()=>isWorker()&&P.major.tags.includes("tech"),p=>{if(check("iq",26)){setFx({iq:2,salary:4000,net:1});L("行业迎来技术变革，你嗅觉敏锐第一时间转型，吃到红利。","e");ach("时代弄潮儿");}else{setFx({salary:Math.floor(P.salary*0.7),stress:25,eq:-1});L("技术变革冲击下你被时代落下，岗位被裁，只能从头学。","b");rec("被技术变革冲击");}});
+W(()=>isWorker()&&P.major.tags.includes("med"),p=>{if(check("eq",25)){setFx({eq:2,net:2,wth:5000});L("医院里一位家属情绪激动，你冷静安抚化解医闹，获医院嘉奖。","e");}else{setFx({sta:-5,health:-6,stress:15});L("医闹激化，你被推搡受伤，医院给了几天假。","b");rec("遭遇医闹");}});
+W(()=>isWorker()&&P.major.tags.some(t=>["tech","art","law"].includes(t)),p=>{setFx({wth:ri(10000,50000),net:2});L("你的技术方案/设计被公司采用申请了专利，名利双收。","e");ach("专利达人");});
+W(()=>true,p=>{const b=ri(10000,60000);setFx({wth:b,stress:-5,salary:ri(1000,3000)});L(`又到年度绩效，你 A+，年终奖 ${b} 元，还涨了薪。`,"e");});
+W(()=>true,p=>{setFx({wth:2000,eq:1,sta:-2});L("公司派你出差，舟车劳顿但见了世面，报销了差旅费。","f");});
+
+function venture(){modalOpen=true;const a=check("iq",24),b=check("eq",20);
+  if(a&&b){const amt=ri(20000,200000);setFx({wth:amt,net:2,stress:10});L(`产品口碑爆棚拿下融资，赚了 ${amt} 元！`,"e");ach("创业初捷");rec("创业第一桶金");}
+  else if(roll(30)){setFx({wth:-ri(20000,80000),stress:30});L("融资失败，烧光积蓄，公司濒临倒闭……","b");}
+  else{setFx({wth:ri(-5000,30000),stress:15});L("公司不温不火，勉强维持收支平衡。","dim");}
+  continueTo(lifeLoop);}
+
+/* 恋爱事件 */
+Lv(()=>P.married,p=>{if(check("eq",22)){setFx({eq:2,wth:-3000,stress:-10});L("婚姻进入平淡期，你主动安排二人旅行，感情重归于好。","e");}else{setFx({eq:-2,stress:20,health:-3});L("婚姻冷战升级，甚至闪过一丝离婚的念头。","b");}});
+Lv(()=>P.married,p=>{const first=!P.children.length,c={name:first?"大宝":"二宝",age:0};P.children.push(c);
+  setFx({wth:-15000,sta:-5,eq:2});L(`你们迎来了${first?"第一个":""}孩子【${c.name}】！养娃开销如流水。`,"g");if(first)ach("为人父母");rec(c.name+"出生");});
+Lv(()=>P.married&&P.spouse&&P.spouse.id==="doctor",p=>{if(roll(25)){if(check("eq",22)){setFx({eq:2,net:1,stress:10});L("配偶医院突发医闹纠纷，你赶到冷静周旋，护住了家人的工作。","e");}else{setFx({eq:-2,sta:-4,health:-6,stress:20});L("配偶被医闹逼得身心俱疲，差点抑郁。","b");}}else{setFx({stress:10,eq:-1});L("医生配偶连日值班，你一个人吃饭带娃，心里不是滋味。","dim");}});
+Lv(()=>P.married&&P.spouse&&P.spouse.id==="programmer",p=>{if(P.stats.eq>=20){setFx({eq:1,stress:-5});L("程序员配偶深夜还在改bug，你送去夜宵和拥抱，感情更稳。","e");}else{setFx({eq:-1,stress:12});L("你们互相抱怨对方不理解自己，隔阂渐生。","b");}});
+Lv(()=>P.married&&P.spouse&&P.spouse.volatile&&P.spouse.id==="entrep",p=>{if(roll(50)){const a=ri(50000,200000);setFx({wth:a,stress:-10});L(`创业者配偶的公司融资成功，家里阔绰起来 +${a.toLocaleString()}。`,"e");}else{const a=ri(20000,80000);setFx({wth:-a,stress:15});L(`创业者配偶公司资金链断裂，家庭损失 ${a.toLocaleString()}。`,"b");}});
+Lv(()=>(P.married||P.love)&&P.age>=28,p=>{if(!P.children.length)return;const c=P.children[0];
+  modalOpen=true;show({title:"子女教育",text:`孩子到了上学的年纪，怎么培养？${N()}可用存款 ${P.stats.wth.toLocaleString()} 元`,
+    opts:[{label:"砸钱上名校/兴趣班（花 3 万起）",avail:P.stats.wth>=30000,fn:()=>{const cst=ri(30000,150000);setFx({wth:-cst,stress:10});if(check("iq",20)){setFx({eq:1});L(`你花 ${cst} 元让孩子上好学校，孩子很争气成绩名列前茅。`,"e");ach("虎爸虎妈");}else{setFx({stress:15,eq:-1});L("砸重金报班，孩子反倒压力大厌学了，你有点后悔。","b");}continueTo(lifeLoop);}},
+    {label:"顺其自然，快乐成长",fn:()=>{setFx({eq:1});L("你让孩子自由成长，童年很快乐，成绩中不溜秋。","f");continueTo(lifeLoop);}}]});});
+
+/* 生活事件 */
+Lf(()=>true,p=>{modalOpen=true;show({title:"人情往来",text:"一位多年好友遇到难关，开口向你求助：",
+  opts:[{label:"慷慨解囊（花 2 万，情谊+）",avail:P.stats.wth>=20000,fn:()=>{setFx({wth:-20000,net:3,eq:1});L("你雪中送炭，多年后他成了你最重要的贵人。","e");rec("仗义疏财");continueTo(lifeLoop);}},
+  {label:"婉拒，表示自己也不宽裕",fn:()=>{setFx({net:-3,stress:3});L("你婉拒了，但这段情分淡了些。","dim");continueTo(lifeLoop);}}]});});
+Lf(()=>true,p=>{if(check("eq",18)){setFx({net:2,eq:1});L("老同学聚会，你谈笑风生，还听到一个不错的行业机会。","e");}else{setFx({net:-1});L("你默默在角落刷手机，和谁都聊不到一块。","dim");}});
+Lf(()=>true,p=>{if(roll(2)){setFx({wth:5000000});L("!!!!你随手买的彩票中了 500 万元大奖！！！！天选之子！！","g");ach("天选之子");rec("彩票中大奖");}else{L("你随手买了张彩票，没中，就当做公益了。","dim");}});
+Lf(()=>true,p=>{if(check("eq",20)){setFx({eq:1,stress:-5});L("生活平平淡淡，你忽然想通了：平淡才是真，开始享受当下。","f");}else{setFx({stress:8});L("夜里琢磨人生意义，越想越焦虑，失眠了一整晚。","b");}});
+Lf(()=>P.stats.net>=15,p=>{setFx({net:1});L("*多年积累的人脉，就是你人生最大的财富。","dim");});
+
+/* 健康事件 */
+H(()=>P.age>=20,p=>{if(P.health>70){setFx({stress:-5});L("年度体检各项正常，医生夸你保养得不错。","e");}
+  else if(P.health>40){setFx({stress:8});L("体检单有几项异常，医生叮嘱你注意作息。","dim");}
+  else{modalOpen=true;setFx({stress:20,sta:-2});L("体检亮起红灯！进一步检查竟查出重症：","b");const s=pick(SERIOUS);seriousIllness(s);}});
+H(()=>true,p=>{if(check("sta",15)){setFx({sta:5,health:5,stress:-10});L("办了健身卡坚持运动，身材和精力都回来了。","e");}else{setFx({wth:-2000,sta:1});L("办了健身卡去了一周就吃灰，钱白花了。","dim");}});
+H(()=>true,p=>{const d=pick(LIGHT);setFx({wth:-d.cost,sta:-1,health:-d.hp});L(`你病倒了：${d.name}，看病花了 ${d.cost} 元。`,"b");});
+H(()=>P.age>=40,p=>{const d=pick(CHRONIC);setFx({wth:-d.cost,sta:-1,health:-d.hp});L(`确诊慢性病：${d.name}，每月药费 ${d.cost} 元。健康是最贵的奢侈品。`,"b");});
+function seriousIllness(s){show({title:P.age+"岁 · 与死神赛跑",text:`#确诊【${s.name}】，治疗费约 ${s.cost.toLocaleString()} 元。${N()}生命攸关的十字路口：`,
+  opts:[
+  {label:`全力治疗（花 ${s.cost.toLocaleString()} 元）`,fn:()=>{if(P.stats.wth<s.cost)setFx({wth:-Math.floor(s.cost/2),stress:30});else{setFx({wth:-s.cost,stress:20});}if(roll(s.kill*100)){P.alive=false;P.deathReason=s.name+"夺走了你的生命";endGame();}else{setFx({health:60,sta:-10});L("治疗很成功！你从鬼门关走了回来。","e");ach("战胜病魔");rec("战胜"+s.name);continueTo(lifeLoop);}}},
+  {label:"动用关系找名医（人脉≥25，费用减半）",avail:P.stats.net>=25,fn:()=>{const c=Math.floor(s.cost*0.5);setFx({wth:-c,net:-10,stress:20});rec("动用宝贵人脉求医");if(roll(s.kill*70)){P.alive=false;P.deathReason=s.name+"最终还是要了你的命";endGame();}else{setFx({health:65,sta:-8});L("动用多年人脉找到顶级专家，妙手回春，你重获新生！","e");ach("战胜病魔");continueTo(lifeLoop);}}},
+  {label:"保守治疗（赌一把，费用少风险大）",fn:()=>{setFx({wth:-Math.floor(s.cost*0.15),stress:20});if(roll(s.kill*100+20)){P.alive=false;P.deathReason=s.name+"恶化";endGame();}else{setFx({health:45,sta:-5});L("奇迹发生！病情竟然慢慢好转了。","e");continueTo(lifeLoop);}}}]});}
+
+/* ---------- 恋爱 · 相亲 ---------- */
+function meet(){
+  const candidates=[];while(candidates.length<3){const c=pick(SPOUSES);if(!candidates.includes(c))candidates.push(c);}
+  modalOpen=true;
+  const text=`缘分来了！朋友给你介绍对象，相亲局上认识了三位候选人：${N()}${candidates.map((c,i)=>`${i+1}. ${c.name}（${c.desc}）`).join(N())}`;
+  show({title:P.age+"岁 · 相亲",text,opts:candidates.map(c=>({label:"与 "+c.name+" 深入交往",fn:()=>{P.love=c;rec("与"+c.name+"开始交往");logq=[`%你和【${c.name}】开始交往，恋爱的感觉真好。`];meet2(c);}}))});
+}
+function meet2(c){show({title:"恋爱ing",text:`%你和【${c.name}】交往了一段时间。${N()}某个周末，你们约会：`,
+  opts:[{label:"约会升温（吃饭看电影逛街）",fn:()=>{if(check("eq",18)){setFx({eq:2,wth:-800});L("你风趣体贴，感情迅速升温。","e");}else{setFx({eq:-1,stress:10});L("你全程尬聊，气氛尴尬，对方消息回得越来越慢。","b");}propose(c);}}]});}
+function propose(c){logq.push(N()+"你想到了结婚。");
+  show({title:"求婚",text:`%你需要准备戒指，花 ${20000} 元。${N()}你鼓起勇气：`,
+    opts:[{label:"准备了戒指，向 TA 求婚",avail:P.stats.wth>=20000,fn:()=>{const cost=ri(20000,50000);if(check("eq",20)){setFx({wth:-cost});P.married=true;P.spouse=P.love;rec("与"+P.spouse.name+"结婚");ach("步入婚姻");if(P.spouse.net)setFx({net:3});P.salary+=Math.floor(P.spouse.salary/2);logq=[`%她/他答应了！婚礼办得温馨隆重。从此你有家了，另一半是【${P.spouse.name}】。`];readyNext();}else{setFx({eq:-1,stress:12});logq=[`%她/他婉拒了：『再给我一点时间』。感情还在。`];readyNext();}}},
+      {label:"再等等（怕被拒绝）",fn:()=>{setFx({stress:8,eq:1});logq=["%你把戒指收好，决定再准备得更充分一些。"];readyNext();}}]});}
+function readyNext(){continueTo(lifeLoop);}
+
+/* ---------- 买车 / 买房 ---------- */
+function buyCar(){modalOpen=true;const text=`你攒了一笔钱，想买车改善生活：${N()}${CARS.map((c,i)=>`${i+1}. ${c.name}（${c.price.toLocaleString()}元 · ${c.desc}）`).join(N())}${N()}${N()}可用存款：${P.stats.wth.toLocaleString()} 元`;
+  show({title:P.age+"岁 · 买车",text,opts:CARS.map(c=>({label:"买 "+c.name,avail:P.stats.wth>=c.price,fn:()=>{setFx({wth:-c.price});P.car=c;rec("购买"+c.name);ach("有车一族");logq=[`%你拥有了【${c.name}】！周末可以自驾游了。`];readyNext();}})).concat([{label:"先不买，继续攒钱",fn:()=>{logq=["你决定再等等，先把钱花在刀刃上。"];readyNext();}}])});}
+function buyHouse(){modalOpen=true;const text=`你看了大半年房，中介给了几个选择：${N()}${HOUSES.map((h,i)=>`${i+1}. ${h.name}（${h.price.toLocaleString()}元 · 月供${h.month} · ${h.desc}）`).join(N())}${N()}${N()}可用存款：${P.stats.wth.toLocaleString()} 元（首付需 30%）`;
+  show({title:P.age+"岁 · 买房大事",text,opts:HOUSES.map(h=>({label:`买 ${h.name}（首付${Math.floor(h.price*0.3).toLocaleString()}）`,avail:P.stats.wth>=h.price*0.3,fn:()=>{const down=Math.floor(h.price*0.3);setFx({wth:-down});P.house=h;P.mortgage=h.month;rec("购买"+h.name);ach("有房一族");logq=[`%你付了 ${down.toLocaleString()} 首付，拿下【${h.name}】。每月还贷 ${h.month} 元，心里踏实。`];readyNext();}})).concat([{label:"继续租房（月租 1500）",fn:()=>{setFx({wth:-1500*12,stress:5});logq=["你继续租房，房东又涨租了。"];readyNext();}}])});}
+
+/* ---------- 晋升 / 退休 ---------- */
+function milestonePromotion(){
+  modalOpen=true;
+  if(check("iq",24)&&check("eq",20)){
+    const titles=["部门主管","项目总监","副总经理"],idx=Math.min(P.promoted,titles.length-1);
+    const nt=P.promoted<3?titles[idx]:"公司元老/高管";P.promoted++;P.salary=Math.floor(P.salary*1.3);P.job=nt;
+    setFx({stress:-10,net:2});rec("晋升为"+nt);ach("晋升"+nt);
+    L(`%凭实力与情商，你在 ${P.age} 岁晋升为【${nt}】，月薪 ${P.salary.toLocaleString()} 元！`,"e");
+  }else{const y=[30,40,55][Math.min(P.promoted,2)];setFx({stress:15});L(`#${y} 岁大关，你晋升竞聘落选。看着同期同事步步高升，心里不是滋味。`,"b");}
+  continueTo(lifeLoop);
+}
+function retireLife(){modalOpen=true;P.retired=true;P.job="退休生活";P.salary=Math.max(3000,Math.floor((P.salary||6000)*0.5));rec("退休");
+  if(P.stats.wth>=1000000)ach("财富自由");
+  L(`%你在 ${P.age} 岁光荣退休，每月退休金 ${P.salary.toLocaleString()} 元。忙了大半辈子，终于能慢下来了。`,"e");
+  continueTo(lifeLoop);
+}
+
+/* ---------- 启动 ---------- */
+window.addEventListener("DOMContentLoaded",()=>{showAlloc();});
+</script>
+</body>
+</html>
